@@ -4,3 +4,6 @@ Revision history for Perl extension AI::Pathfinding::SMAstar.
 	- original version; created by h2xs 1.23 with options
 		-XAn AI::Pathfinding::SMAstar
 
+0.02  Fri Feb 25 11:17:01 2010
+	- updated pod documentation
+

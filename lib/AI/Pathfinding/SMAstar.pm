@@ -1,6 +1,6 @@
 package AI::Pathfinding::SMAstar;
 
-use 5.010000;
+use 5.006000;
 use strict;
 use warnings;
 
@@ -25,7 +25,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use AI::Pathfinding::SMAstar::PriorityQueue;
 use AI::Pathfinding::SMAstar::Path;
@@ -547,9 +547,11 @@ to a goal in your search space, you must define what a I<node> is, in your searc
 A common example used for informed search methods, and one that is used in Russell's 
 original paper, is optimal puzzle solving, such as solving a 15-tile puzzle.   If trying 
 to solve such a puzzle, a I<node> in the search space could be defined as a particular 
-configuration of that puzzle.   In the /t directory of this module's distribution, SMA* is 
-applied to the problem of finding the shortest palindrome that contains a minimum number 
-of letters specified, over a given lexicon of words.
+configuration of that puzzle.   
+
+In the example provided in the /t directory of this module's distribution, SMA* is 
+applied to the problem of finding the shortest palindrome that contains a minimum 
+number of letters specified, over a given list of words.
 
 Once you have a definition and representation of a node in your search space, SMA* 
 search requires the following functions to work:
@@ -566,7 +568,9 @@ This function must return the cost of this node in the search space.   In all
 forms of A* search, this means the cost paid to arrive at this node along a path, plus the 
 estimated cost of going from this node to a goal state.   This function must be I<positive> 
 and I<monotonic>, meaning that successor nodes mustn't be less expensive than their 
-antecedent nodes.   Monotonicity is ensured in this implementation of SMA*, so even if your 
+antecedent nodes.   
+
+NOTE: Monotonicity is ensured in this implementation of SMA*, so even if your 
 function is not monotonic, SMA* will assign the antecedent node's cost to a successor if 
 that successor costs less than the antecedent.
 
@@ -590,9 +594,10 @@ are reachable from this node via a single operation.
 
 B<State successors iterator> (_state_iterator above)
 
-This function must return the next successor of this node, i.e. it must be an 
-iterator that produces the successors of this node *one* at a time.    This is necessary 
-to maintain the memory-bounded constraint of SMA* search.
+This function must return a I<handle to a function> that produces the next successor of 
+this node, i.e. it must return an iterator function that produces the successors of this 
+node *one* at a time.    This is necessary to maintain the memory-bounded 
+constraint of SMA* search.
 
 
 =item *
@@ -654,10 +659,10 @@ An integer indicating the maximum cost, beyond which nodes will not be expanded.
 
 =head2 Overview
 
-Memory-bounded A* search (or SMA* search) addresses some of the limitations of conventional 
-A* search, by bounding the amount of space required to perform a shortest-path search.   
-This module is an implementation of SMA*,which was first introduced by Stuart Russell in 
-1992.   SMA* is a more efficient variation of the original MA* search introduced by 
+Simplified Memory-bounded A* search (or SMA* search) addresses some of the limitations of 
+conventional A* search, by bounding the amount of space required to perform a shortest-path 
+search.   This module is an implementation of SMA*, which was first introduced by Stuart Russell 
+in 1992.   SMA* is a more efficient variation of the original MA* search introduced by 
 P. Chakrabarti et al. in 1989 (see references below).
 
 
@@ -714,22 +719,26 @@ out of memory.
 =head3 SMA* Search
 
 SMA* search addresses the possibility of running out of memory during search by pruning the portion 
-of the search-space that is being examined.    It uses the I<pathmax>, 
-or I<monotonicity> constraint on I<f(n)> to remove nodes from the search queue when there is 
-no memory left to expand new nodes, recording the pruned node costs within their antecedent nodes to ensure 
-that information about the search space is not lost.   This allows SMA* search to utilize all 
-available memory for search, without any danger of overflow.   It can, however, make 
-SMA* search significantly slower than a theoretical unbounded-memory search,
-due to the extra bookkeeping it must do, and because nodes may need to be re-expanded 
-(the overall number of nodes examined may increase).
+of the search-space that is being examined.    It relies on the I<pathmax>, 
+or I<monotonicity> constraint on I<f(n)> to remove the shallowest of the highest-cost 
+nodes from the search queue when there is no memory left to expand new nodes.  It records the 
+pruned node costs within their antecedent nodes to ensure that information about the search 
+space is not lost.   To facilitate this, the search queue is best maintained as a search-tree of
+search-trees ordered by cost and depth, respectively.
 
-It can be shown that of the memory-bounded variations of A* search, such IDA*, 
+The pruning of the search queue allows SMA* search to utilize all available memory for search, 
+without any danger of overflow.   It can, however, make SMA* search significantly slower than 
+a theoretical unbounded-memory search, due to the extra bookkeeping it must do, and because 
+nodes may need to be re-expanded (the overall number of nodes examined may increase).
+
+It can be shown that of the memory-bounded variations of A* search, such MA*, IDA*, 
 Iterative Expansion, etc., SMA* search expands the least number of nodes on average.
 However, for certain classes of problems, particularly those where the branching factor
 of the search space is large, guaranteeing optimality can be costly. 
-Stochastic methods or approximation algorithms such as Simulated Annealing can 
-provide massive gains in time and space performance, while introducing a tunable probability of 
-producing a sub-optimal solution.
+Stochastic methods or approximation algorithms such as I<Simulated Annealing> can 
+provide massive gains in time and space performance, while introducing a tunable 
+probability of producing a sub-optimal solution.
+
 
 =head1 METHODS
 
@@ -782,7 +791,7 @@ Set/get the handle to the function that returns the number of successors of this
 
  $smastar->state_successors_iterator(\&FrontierObj::get_successors_iterator);
 
-Set/get the handle to the function that returns the next successor of this node.
+Set/get the handle to the function that returns iterator that produces the next successor of this node.
 
 
 =head2 state_get_data_func()
