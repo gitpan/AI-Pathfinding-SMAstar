@@ -31,7 +31,7 @@ sub new {
     my $class   = ref($invocant) || $invocant;
     my $self = {
 	
-	_path                    => undef,  # node in the search space
+	_state                    => undef,  # node in the search space
 	_eval_func               => undef,
 	_goal_p_func             => undef,
 	_num_successors_func     => undef,
@@ -75,6 +75,12 @@ sub new {
 ##############################################
 # accessors
 ##############################################
+
+sub state{
+    my $self = shift;
+    if (@_) { $self->{_state} = shift }
+    return $self->{_state};
+}
 
 sub antecedent{
     my $self = shift;
@@ -157,7 +163,7 @@ sub fcost
     }
 
     my $eval_func = $self->{_eval_func};
-    my $result =  $eval_func->($self->{_path});
+    my $result =  $eval_func->($self->{_state});
     $self->{_f_cost} = $result;
 
     return $result;
@@ -172,7 +178,7 @@ sub is_goal
     my ($self) = @_;
       
     my $goal_p_func = $self->{_goal_p_func};
-    my $result =  $goal_p_func->($self->{_path});
+    my $result =  $goal_p_func->($self->{_state});
 
     return $result;
 }
@@ -184,7 +190,7 @@ sub get_num_successors
     my ($self) = @_;
       
     my $num_successors_func = $self->{_num_successors_func};
-    my $result =  $num_successors_func->($self->{_path});
+    my $result =  $num_successors_func->($self->{_state});
 
     return $result;    
 }
@@ -196,7 +202,7 @@ sub get_successors_iterator
       
     my $successors_iterator = $self->{_successors_iterator};
 
-    my $iterator = $successors_iterator->($self->{_path});
+    my $iterator = $successors_iterator->($self->{_state});
     
     return $iterator;    
 }
@@ -454,10 +460,10 @@ sub get_descendants_iterator_smastar
 	
 
 	# loop over nodes returned by iterator
-	while(my $next_path = $iterator->()){	
+	while(my $next_state = $iterator->()){	
 
 	    $next_descendant = AI::Pathfinding::SMAstar::Path->new(
-		_path => $next_path,
+		_state => $next_state,
 		_eval_func => $self->{_eval_func},
 		_goal_p_func => $self->{_goal_p_func},
 		_get_data_func => $self->{_get_data_func},
@@ -468,8 +474,8 @@ sub get_descendants_iterator_smastar
 		);
 
     		
-	    my $start_word = $next_descendant->{_path}->{_start_word};
-	    my $phrase = $next_descendant->{_path}->{_phrase};
+	    my $start_word = $next_descendant->{_state}->{_start_word};
+	    my $phrase = $next_descendant->{_state}->{_phrase};
 	    
 	    my $already_produced_p = $self->{_descendants_produced}->[$i] || ($self->{_descendant_fcosts}->[$i] != -1);
 	    
@@ -481,7 +487,7 @@ sub get_descendants_iterator_smastar
 
 		if($i == $num_successors - 1 && $descendants_deleted){
 		    # !!! resetting iterator index. descendants have been deleted. clearing forgotten_fcosts on next expansion.
-		    $iterator = $self->{_path}->get_descendants_iterator();
+		    $iterator = $self->{_state}->get_descendants_iterator();
 		    $self->{_iterator_index} = 0;
 		    $i = 0;		
 
@@ -523,7 +529,7 @@ sub get_descendants_iterator_smastar
 		$self->{_iterator_index} = $i + 1;
 		
 		if($self->{_iterator_index} == $self->{_num_successors}){
-		    $iterator = $self->{_path}->get_descendants_iterator();
+		    $iterator = $self->{_state}->get_descendants_iterator();
 		    $self->{_iterator_index} = 0;
 		    $i = 0;
 		    	
@@ -541,7 +547,7 @@ sub get_descendants_iterator_smastar
 	if($i >= $num_successors - 1 && $descendants_deleted && $self->depth() == 0){
             # root node.  going to reset iterator index. descendants have been deleted.  Also, will be
             # clearing out forgotten_descendants fcost list, since those descendants will be re-generated anyway.
-	    $iterator = $self->{_path}->get_descendants_iterator();
+	    $iterator = $self->{_state}->get_descendants_iterator();
 	    $self->{_iterator_index} = 0;
 	    $i = 0;
 	    	   
@@ -576,7 +582,7 @@ sub get_data
     my ($self) = @_;
 
     my $get_data_func = $self->{_get_data_func};
-    my $data = $get_data_func->($self->{_path});
+    my $data = $get_data_func->($self->{_state});
     
     return $data;
 }
@@ -587,24 +593,11 @@ sub DESTROY
 {
     my ($self) = @_;
 
-    my $antecedent;
-    my $ant_phrase;
-
-    my ($pkg, $filename, $line_num) = caller(); 
-
+    # antecedent is no longer pointing at this object, or else
+    # DESTROY would not have been called.  
     if($self->{_antecedent}){
-	$antecedent = $self->{_antecedent};
-	$ant_phrase = $antecedent->{_path}->{_phrase} ? $antecedent->{_path}->{_phrase} : $antecedent->{_path}->{_start_word};
+	delete $self->{_antecedent};
     }
-    else{	
-	$antecedent->{_path}->{_phrase} = "none";
-    }
-
-    if($line_num == 0){ # line_num is zero
-	$d++;
-    }
-    delete $self->{_antecedent};
-   
 }
 
 

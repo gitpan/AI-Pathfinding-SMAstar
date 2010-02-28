@@ -209,7 +209,7 @@ $palindrome_phr_obj = $smastar->start_search(
 
 my $palindrome;
 if($palindrome_phr_obj){
-    $palindrome = $palindrome_phr_obj->{_path}->roll_up_phrase();
+    $palindrome = $palindrome_phr_obj->{_state}->roll_up_phrase();
 }
 diag("ran SMA search:   palindrome is '$palindrome'");
 
@@ -255,16 +255,16 @@ sub log_function
     my $evaluation = -1;
     my $depth = 0;
     
-    $str = $path_obj->{_path}->{_start_word};
+    $str = $path_obj->{_state}->{_start_word};
     # $cand is the parent's word (the candidate that generated this phrase)
-    $cand = defined($path_obj->{_path}->{_cand}) ? $path_obj->{_path}->{_cand} : "";  
-    $cost = $path_obj->{_path}->{_cost};
-    $cost_so_far = $path_obj->{_path}->{_cost_so_far};
-    $num_new_chars = $path_obj->{_path}->{_num_new_chars};
-    $num_chars_so_far = $path_obj->{_path}->{_num_chars_so_far};
-    $letters_seen = $path_obj->{_path}->{_letters_seen};
+    $cand = defined($path_obj->{_state}->{_cand}) ? $path_obj->{_state}->{_cand} : "";  
+    $cost = $path_obj->{_state}->{_cost};
+    $cost_so_far = $path_obj->{_state}->{_cost_so_far};
+    $num_new_chars = $path_obj->{_state}->{_num_new_chars};
+    $num_chars_so_far = $path_obj->{_state}->{_num_chars_so_far};
+    $letters_seen = $path_obj->{_state}->{_letters_seen};
     $letters_seen_str = join("", @$letters_seen); 
-    $phrase = defined($path_obj->{_path}->{_phrase}) ? $path_obj->{_path}->{_phrase} : "";    
+    $phrase = defined($path_obj->{_state}->{_phrase}) ? $path_obj->{_state}->{_phrase} : "";    
     $evaluation = AI::Pathfinding::SMAstar::Path::fcost($path_obj);
     $depth = $path_obj->{_depth};
         
@@ -303,8 +303,8 @@ sub str_function
 {
     my ($path_obj) = @_;    
     
-    my $sw = defined($path_obj->{_path}->{_start_word}) ? $path_obj->{_path}->{_start_word} : "";    
-    my $phrase = defined($path_obj->{_path}->{_phrase}) ? $path_obj->{_path}->{_phrase} : "";    
+    my $sw = defined($path_obj->{_state}->{_start_word}) ? $path_obj->{_state}->{_start_word} : "";    
+    my $phrase = defined($path_obj->{_state}->{_phrase}) ? $path_obj->{_state}->{_phrase} : "";    
  
     my $str = "$sw, $phrase";
     

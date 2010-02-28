@@ -1,4 +1,4 @@
-AI-Pathfinding-SMAstar version 0.02
+AI-Pathfinding-SMAstar version 0.03
 ===================================
 
 NAME
@@ -14,8 +14,8 @@ EXAMPLE
  ##################################################################
  #
  # This example uses a hypothetical object called FrontierObj, and
- # shows the functions that FrontierObj must feature, in order to 
- # perform a path search in a solution-spacepopulated by 
+ # shows the functions that FrontierObj must feature in order to 
+ # perform a path search in a solution-space populated by 
  # FrontierObj objects.
  #
  ##################################################################
@@ -41,11 +41,15 @@ EXAMPLE
     );
 
  # you can start the search from multiple start-states
+ # Add the initial states to the smastar object before starting the search.
  foreach my $frontierObj (@start_states){
     $smastar->add_start_state($frontierObj);
  }
 
- 
+ # Start the search.  If successful, frontierGoalObj will contain the 
+ # goal node.   The optimal path to the goal node will be encoded in the 
+ # ancestry of the goal node.   $frontierGoalObj->antecedent() contains
+ # the goal object's parent, and so forth back to the start state.
  my $frontierGoalObj = $smastar->start_search(
     \&log_function,       # returns a string used for logging progress
     \&str_function,       # returns a string used to *uniquely* identify a node 

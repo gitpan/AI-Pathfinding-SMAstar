@@ -25,10 +25,11 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use AI::Pathfinding::SMAstar::PriorityQueue;
 use AI::Pathfinding::SMAstar::Path;
+use Scalar::Util;
 use Carp;
 
 my $DEBUG = 0;
@@ -95,7 +96,12 @@ sub show_prog_func {
 
 
 
-
+###################################################################
+#
+# Add a state from which to begin the search.   There can 
+# be multiple start-states.
+#
+###################################################################
 sub add_start_state
 {
     my ($self, $state) = @_;
@@ -106,7 +112,8 @@ sub add_start_state
     my $state_num_successors_func = $self->{_state_num_successors_func},
     my $state_successors_iterator = $self->{_state_successors_iterator},
     my $state_get_data_func = $self->{_state_get_data_func};
-
+    
+    # make sure required functions have been defined
     if(!defined($state_eval_func)){
 	croak "SMAstar:  evaluation function is not defined\n";
     }
@@ -120,9 +127,9 @@ sub add_start_state
 	croak "SMAstar:  successor iterator is not defined\n";
     }
 
-
+    # create a path object from this state
     my $state_obj = AI::Pathfinding::SMAstar::Path->new(
-	_path           => $state,
+	_state           => $state,
 	_eval_func      => $state_eval_func,
 	_goal_p_func    => $state_goal_p_func,
 	_num_successors_func => $state_num_successors_func,
@@ -132,11 +139,21 @@ sub add_start_state
     
     
     my $fcost = AI::Pathfinding::SMAstar::Path::fcost($state_obj);
+    # check if the fcost of this node looks OK (is numeric)
+    unless(Scalar::Util::looks_like_number($fcost)){
+	croak "Error:  f-cost of state is not numeric.  Cannot add state to queue.\n";	
+    }
     $state_obj->f_cost($fcost);
 
+    # check if the num_successors function returns a number
+    my $num_successors = $state_obj->get_num_successors();
+    unless(Scalar::Util::looks_like_number($num_successors)){
+	croak "Error:  Number of state successors is not numeric.  Cannot add state to queue.\n";	
+    }
 
+
+    # add this node to the queue
     $self->{_priority_queue}->insert($state_obj);
-
 }
 
 ###################################################################
@@ -188,7 +205,7 @@ sub sma_star_tree_search
 	$successors_func,
 	$eval_func,
 	$backup_func,
-	$log_function, # debug string func
+	$log_function, # debug string func;  represent state object as a string.
 	$str_function,
 	$prog_function,
 	$show_prog_func,
@@ -215,12 +232,11 @@ sub sma_star_tree_search
 	# loop over the elements in the priority queue
 	while(!$$priority_queue->is_empty()){
 	    
+	    # determine the current size of the queue
 	    my $num_states_in_queue = $$priority_queue->{_size};
-
 	    # get the best candidate for expansion from the queue
 	    $best = $$priority_queue->deepest_lowest_cost_leaf_dont_remove();
     
-
 	    #------------------------------------------------------
 	    if(!$DEBUG){
 		my $str = $log_function->($best);		 
@@ -234,7 +250,8 @@ sub sma_star_tree_search
 
 
 	    if($best->$goal_p()) {			
-		#  goal achieved!  iteration: $iteration. num_states in queue: $num_states_in_queue.
+		# goal achieved! iteration: $iteration, number of 
+		# states in queue: $num_states_in_queue.
 		return $best; 
 	    }
 	    else{	    
@@ -258,17 +275,16 @@ sub sma_star_tree_search
 		if($best->is_completed()){
 
 
-		    #print "backing up best\n";
-
 		    # remove from queue first, back up fvals, then insert back on queue. 
 		    # this way, it gets placed in its rightful place on the queue.		    
 		    my $fval_before_backup = $best->{_f_cost};
 		   
 		    # STEPS:
-		    # 1) remove best and all antecedents from queue, but only if they are going to be 
-		    # altered by backing-up fvals.    This is because removing and re-inserting in queue
-		    # changes temporal ordering, and we don't want to do that unless the node will be
-		    # placed in a new cost-bucket/tree.
+		    # 1) remove best and all antecedents from queue, but only if they are 
+		    #    going to be altered by backing-up fvals.    This is because 
+		    #    removing and re-inserting in queue changes temporal ordering,
+		    #    and we don't want to do that unless the node will be
+		    #    placed in a new cost-bucket/tree.
 		    # 2) then backup fvals
 		    # 3) then re-insert best and all antecedents back on queue.
 
@@ -296,7 +312,9 @@ sub sma_star_tree_search
 
 		    # Now remove the offending nodes from queue, if any
 		    if($best->need_fval_change()){
-			$best = $$priority_queue->deepest_lowest_cost_leaf();  # removes best from the queue
+			
+			# remove best from the queue
+			$best = $$priority_queue->deepest_lowest_cost_leaf();  
 		    
 			while($antecedent){
 			    my $path_str = $str_function->($antecedent);	
@@ -323,32 +341,30 @@ sub sma_star_tree_search
 			my $antecedent = $best->{_antecedent};
 			my $i = 0;
 			while($antecedent){
-			    if($was_on_queue{$i} && $antecedent->need_fval_change()){  # the antecedent needed fval change too.
+			    if($was_on_queue{$i} && $antecedent->need_fval_change()){  
+                                # the antecedent needed fval change too.
 				$$priority_queue->insert($antecedent);
 			    }
 			    if($antecedent->need_fval_change()){
-				# set need_fval_change back to 0, so it will not be automatically  seen as needing changed in the future.  This
-				# is important, since we do not want to remove an element from the queue *unless* we need to change 
-				# the fcost.   this is because when we remove it from the queue and re-insert it, it loses it's
-				# seniority in the queue (it becomes the newest node at its cost and depth) and will not be removed 
-				# at the right time when searching for deepest_lowest_cost_leafs or shallowest_highest_cost_leafs.
+				# set need_fval_change back to 0, so it will not be automatically  seen as 
+				# needing changed in the future.  This is important, since we do not want
+				# to remove an element from the queue *unless* we need to change the fcost. 
+				# This is because when we remove it from the queue and re-insert it, it
+				# loses its seniority in the queue (it becomes the newest node at its cost 
+				# and depth) and will not be removed at the right time when searching for
+				# deepest_lowest_cost_leafs or shallowest_highest_cost_leafs.
 				$antecedent->{_need_fcost_change} = 0;
 			    }
 
 			    $antecedent = $antecedent->{_antecedent};
 			    $i++;			    
 			}
-			# set need_fval_change back to 0, so it will not be automatically seen as needing changed in the future.  This
-			# is important, since we do not want to remove an element from the queue *unless* we need to change 
-			# the fcost.   this is because when we remove it from the queue and re-insert it, it loses it's
-			# seniority in the queue (it becomes the newest node at its cost and depth) and will not be removed 
-			# at the right time when searching for deepest_lowest_cost_leafs or shallowest_highest_cost_leafs.
+			# Again, set need_fval_change back to 0, so it will not be automatically 
+			# seen as needing changed in the future.
 			$best->{_need_fcost_change} = 0;
 		    }
 		}
 
-
-		#print "best's fcost is now: " . $best->{_f_cost} . "\n";
 
 		#
 		# If best's descendants are all in memory, mark best as completed.
@@ -377,8 +393,8 @@ sub sma_star_tree_search
 
 		    # If best is not a root node
 		    if($best->{_depth} != 0){
-			# descendant index is the unique index describing what descendant this node
-			# is of its antecedent.
+			# descendant index is the unique index indicating which descendant
+			# this node is of its antecedent.
 			my $descendant_index = $best->{_descendant_index};
 			my $antecedent = $best->{_antecedent};
 			$$priority_queue->remove($best, $cmp_func->($best_str)); 
@@ -485,7 +501,7 @@ __END__
 
 =head1 NAME
 
-AI::Pathfinding::SMAstar - Memory-bounded A* Search
+AI::Pathfinding::SMAstar - Simplified Memory-bounded A* Search
 
 
 =head1 SYNOPSIS
@@ -498,8 +514,8 @@ AI::Pathfinding::SMAstar - Memory-bounded A* Search
  ##################################################################
  #
  # This example uses a hypothetical object called FrontierObj, and
- # shows the functions that FrontierObj must feature, in order to 
- # perform a path search in a solution-spacepopulated by 
+ # shows the functions that the FrontierObj class must feature in 
+ # order to perform a path-search in a solution space populated by 
  # FrontierObj objects.
  #
  ##################################################################
@@ -524,13 +540,23 @@ AI::Pathfinding::SMAstar - Memory-bounded A* Search
         _show_prog_func            => \&FrontierObj::progress_callback,      
     );
 
- # you can start the search from multiple start-states
+ # You can start the search from multiple start-states.
+ # Add the initial states to the smastar object before starting the search.
  foreach my $frontierObj (@start_states){
     $smastar->add_start_state($frontierObj);
  }
 
  
- my $frontierGoalObj = $smastar->start_search(
+ #
+ # Start the search.  If successful, $frontierGoalPath will contain the 
+ # goal path.   The optimal path to the goal node will be encoded in the 
+ # ancestry of the goal path.   $frontierGoalPath->antecedent() contains
+ # the goal path's parent path, and so forth back to the start path, which
+ # contains the start state.
+ #
+ # $frontierGoalPath->state() contains the goal FrontierObj itself.
+ #
+ my $frontierGoalPath = $smastar->start_search(
     \&log_function,       # returns a string used for logging progress
     \&str_function,       # returns a string used to *uniquely* identify a node 
     $max_states_in_queue, # indicate the maximum states allowed in memory
@@ -549,9 +575,9 @@ original paper, is optimal puzzle solving, such as solving a 15-tile puzzle.   I
 to solve such a puzzle, a I<node> in the search space could be defined as a particular 
 configuration of that puzzle.   
 
-In the example provided in the /t directory of this module's distribution, SMA* is 
-applied to the problem of finding the shortest palindrome that contains a minimum 
-number of letters specified, over a given list of words.
+There is an example provided in the /t directory of this module's distribution, 
+where SMA* is applied to the problem of finding the shortest palindrome that contains 
+a minimum number of letters specified, over a given list of words.
 
 Once you have a definition and representation of a node in your search space, SMA* 
 search requires the following functions to work:
@@ -562,7 +588,7 @@ search requires the following functions to work:
 
 =item *
 
-B<State evaluation function> (_state_eval_func above)
+B<State evaluation function> (C<_state_eval_func above>)
 
 This function must return the cost of this node in the search space.   In all 
 forms of A* search, this means the cost paid to arrive at this node along a path, plus the 
@@ -577,14 +603,14 @@ that successor costs less than the antecedent.
 
 =item *
 
-B<State goal function> (_state_goal_p_func above)
+B<State goal function> (C<_state_goal_p_func> above)
 
 This function must return 1 if the node is a goal node, or 0 otherwise.
 
 
 =item *
 
-B<State number of successors function> (_state_num_successors_func above)
+B<State number of successors function> (C<_state_num_successors_func> above)
 
 This function must return the number of successors of this node, i.e. all nodes that 
 are reachable from this node via a single operation.
@@ -592,7 +618,7 @@ are reachable from this node via a single operation.
 
 =item *
 
-B<State successors iterator> (_state_iterator above)
+B<State successors iterator> (C<_state_iterator> above)
 
 This function must return a I<handle to a function> that produces the next successor of 
 this node, i.e. it must return an iterator function that produces the successors of this 
@@ -602,14 +628,14 @@ constraint of SMA* search.
 
 =item *
 
-B<State get-data function> (_state_get_data_func above)
+B<State get-data function> (C<_state_get_data_func> above)
 
 This function returns a string representation of this node.
 
 
 =item *
 
-B<State show-progress function> (_show_prog_func above)
+B<State show-progress function> (C<_show_prog_fun>c above)
 
 This is a callback function for displaying the progress of the search.   It can be 
 an empty callback if you do not need this output.
@@ -617,7 +643,7 @@ an empty callback if you do not need this output.
 
 =item *
 
-B<log string function> (log_function above)
+B<log string function> (C<log_function> above)
 
 This is an arbitrary string used for logging.    It also gets passed to the show-progress 
 function above.
@@ -625,7 +651,7 @@ function above.
 
 =item *
 
-B<str_function> (str_function above)
+B<str_function> (C<str_function> above)
 
 This function returns a *unique* string representation of this node.   Uniqueness is 
 required for SMA* to work
@@ -722,14 +748,14 @@ SMA* search addresses the possibility of running out of memory during search by 
 of the search-space that is being examined.    It relies on the I<pathmax>, 
 or I<monotonicity> constraint on I<f(n)> to remove the shallowest of the highest-cost 
 nodes from the search queue when there is no memory left to expand new nodes.  It records the 
-pruned node costs within their antecedent nodes to ensure that information about the search 
-space is not lost.   To facilitate this, the search queue is best maintained as a search-tree of
-search-trees ordered by cost and depth, respectively.
+costs of the pruned nodes within their antecedent nodes to ensure that information about the search 
+space is not lost.   To facilitate this mechanism, the search queue is best maintained as a 
+search-tree of search-trees ordered by cost and depth, respectively.
 
 The pruning of the search queue allows SMA* search to utilize all available memory for search, 
 without any danger of overflow.   It can, however, make SMA* search significantly slower than 
 a theoretical unbounded-memory search, due to the extra bookkeeping it must do, and because 
-nodes may need to be re-expanded (the overall number of nodes examined may increase).
+nodes may need to be re-expanded (the overall number of node expansions may increase).
 
 It can be shown that of the memory-bounded variations of A* search, such MA*, IDA*, 
 Iterative Expansion, etc., SMA* search expands the least number of nodes on average.
@@ -833,11 +859,11 @@ None by default.
 
 =head1 SEE ALSO
 
-Russell, Stuart. (1992) "Efficient Memory-bounded Search Methods" Proceedings of the 10th 
+Russell, Stuart. (1992) I<"Efficient Memory-bounded Search Methods."> Proceedings of the 10th 
 European conference on Artificial intelligence, pp. 1-5 
 
-Chakrabarti, P. P., Ghose, S., Acharya, A., and de Sarkar, S. C. (1989) "Heuristic search in 
-restricted memory"  Artificial Intelligence Journal, 41, pp. 197-221.
+Chakrabarti, P. P., Ghose, S., Acharya, A., and de Sarkar, S. C. (1989) I<"Heuristic search in 
+restricted memory.">  Artificial Intelligence Journal, 41, pp. 197-221.
 
 =head1 AUTHOR
 

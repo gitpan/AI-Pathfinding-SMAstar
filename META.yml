@@ -1,7 +1,7 @@
 --- #YAML:1.0
 name:                AI-Pathfinding-SMAstar
-version:             0.02
-abstract:            Memory-bounded A* Search
+version:             0.03
+abstract:            Simplified Memory-bounded A* Search
 license:             ~
 author:              
     - Matthias Beebe <mbeebe@cpan.org>
