@@ -25,7 +25,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.03';
+our $VERSION = '0.031';
 
 use AI::Pathfinding::SMAstar::PriorityQueue;
 use AI::Pathfinding::SMAstar::Path;
@@ -552,7 +552,7 @@ AI::Pathfinding::SMAstar - Simplified Memory-bounded A* Search
  # goal path.   The optimal path to the goal node will be encoded in the 
  # ancestry of the goal path.   $frontierGoalPath->antecedent() contains
  # the goal path's parent path, and so forth back to the start path, which
- # contains the start state.
+ # contains only the start state.
  #
  # $frontierGoalPath->state() contains the goal FrontierObj itself.
  #
@@ -565,15 +565,15 @@ AI::Pathfinding::SMAstar - Simplified Memory-bounded A* Search
 
 
 
-In the example above, a hypothetical object, FrontierObj, is used to represent a I<node> 
-in your search space.   To use SMA* search to find a shortest path from a starting node 
+In the example above, a hypothetical object, C<FrontierObj>, is used to represent a state, or 
+I<node> in your search space.   To use SMA* search to find a shortest path from a starting node 
 to a goal in your search space, you must define what a I<node> is, in your search space 
 (or I<point>, or I<state>).
 
 A common example used for informed search methods, and one that is used in Russell's 
-original paper, is optimal puzzle solving, such as solving a 15-tile puzzle.   If trying 
-to solve such a puzzle, a I<node> in the search space could be defined as a particular 
-configuration of that puzzle.   
+original paper, is optimal puzzle solving, such as solving an 8 or 15-tile puzzle in the
+least number of moves.   If trying to solve such a puzzle, a I<node> in the search space 
+could be defined as a  configuration of that puzzle (a paricular ordering of the tiles).
 
 There is an example provided in the /t directory of this module's distribution, 
 where SMA* is applied to the problem of finding the shortest palindrome that contains 
@@ -592,13 +592,22 @@ B<State evaluation function> (C<_state_eval_func above>)
 
 This function must return the cost of this node in the search space.   In all 
 forms of A* search, this means the cost paid to arrive at this node along a path, plus the 
-estimated cost of going from this node to a goal state.   This function must be I<positive> 
-and I<monotonic>, meaning that successor nodes mustn't be less expensive than their 
-antecedent nodes.   
+estimated cost of going from this node to a goal state:
+
+I<f(x) = g(n) + h(n)>
+
+This function must be I<positive> and I<monotonic>, meaning that the path to a successor node 
+must be at least as expensive overall when compared to the path to that node's antecedent.   So if the 
+nodes along a particular path are labeled:  1 -> 2 -> 3, it must be at least as expensive to 
+arrive at node 3 as it is to arrive at node 2.   This amounts to the evaluation of the following 
+assignment [1] when calculating the cost of a successor of node I<x>:
+
+I<f(successor) = max(f(x), g(successor) + h(successor))>  
 
 NOTE: Monotonicity is ensured in this implementation of SMA*, so even if your 
-function is not monotonic, SMA* will assign the antecedent node's cost to a successor if 
-that successor costs less than the antecedent.
+function is not monotonic (which is possible, even given an admissible heuristic), 
+SMA* will assign the antecedent node's cost to a successor if 
+that successor's I<g+h> amounts to less than the antecedent's f-cost.
 
 
 =item *
@@ -635,7 +644,7 @@ This function returns a string representation of this node.
 
 =item *
 
-B<State show-progress function> (C<_show_prog_fun>c above)
+B<State show-progress function> (C<_show_prog_func> above)
 
 This is a callback function for displaying the progress of the search.   It can be 
 an empty callback if you do not need this output.
@@ -660,7 +669,7 @@ properly.
 
 =item *
 
-B<max states allowed in memory> (max_states_in_queue above)
+B<max states allowed in memory> (C<max_states_in_queue> above)
 
 An integer indicating the maximum number of expanded nodes to hold in memory at 
 any given time.
@@ -668,7 +677,7 @@ any given time.
 
 =item *
 
-B<maximum cost> (MAX_COST above)
+B<maximum cost> (C<MAX_COST> above)
 
 An integer indicating the maximum cost, beyond which nodes will not be expanded.
 
@@ -700,11 +709,12 @@ P. Chakrabarti et al. in 1989 (see references below).
 
 A* Search is an I<optimal> and I<complete> algorithm for computing a sequence of operations 
 leading from a system's start-state (node) to a specified goal.    In this context, I<optimal> 
-means that A* search will return the shortest possible sequence of operations (path) leading to 
-the goal, and I<complete> means that A* will always find a path to the goal if such a path exists.
+means that A* search will return the shortest (or cheapest) possible sequence of 
+operations (path) leading to the goal, and I<complete> means that A* will always find a path to 
+the goal if such a path exists.
 
 In general, A* search works using a calculated cost function on each node along a path, 
-in addition to an I<admissible>heuristic estimating the distance from that node to the goal.  
+in addition to an I<admissible> heuristic estimating the distance from that node to the goal.  
 The cost is calculated as:
 
 I<f(n) = g(n) + h(n)>
@@ -728,42 +738,61 @@ I<h(n)> is the heuristic function, or estimated cost of the path from I<n> to th
 
 =back
 
-The to be I<admissible>, the heuristic must 
-never over-estimate the distance from the node to the goal.   If the heuristic is set to zero, 
-A* search reduces to I<Branch and Bound> search.
 
-For a given heuristic function, it can be shown that A* search is I<optimally efficient>, 
+For a given I<admissible> heuristic function, it can be shown that A* search is I<optimally efficient>, 
 meaning that,  in its calculation of the shortest path, it expands fewer nodes in the search 
 space than any other algorithm.
 
+The to be I<admissible>, the heuristic can never over-estimate the distance from the 
+node to the goal.   Note that if the heuristic I<h(n)> is set to zero, A* search reduces to 
+I<Branch and Bound> search.  If the cost-so-far I<g(n)> is set to zero, A* reduces to 
+I<Greedy Best-first> search (which is neither complete nor optimal).   If both I<g(n)> 
+and I<h(n)> are set to zero, the search becomes I<Breadth-first>.
+
 The space complexity of A* search is bounded by an exponential of the branching factor of 
-the search-space and the length of the longest path examined during the search.   This is 
-can be a problem particularly if the branching factor is large, as the algorithm may run 
+the search-space, by the length of the longest path examined during the search.   This is 
+can be a problem particularly if the branching factor is large, because the algorithm may run 
 out of memory.
 
 
 =head3 SMA* Search
 
-SMA* search addresses the possibility of running out of memory during search by pruning the portion 
-of the search-space that is being examined.    It relies on the I<pathmax>, 
+SMA* search addresses the possibility of running out of memory during search by pruning the 
+portion of the search-space that is being examined.    It relies on the I<pathmax>, 
 or I<monotonicity> constraint on I<f(n)> to remove the shallowest of the highest-cost 
 nodes from the search queue when there is no memory left to expand new nodes.  It records the 
-costs of the pruned nodes within their antecedent nodes to ensure that information about the search 
-space is not lost.   To facilitate this mechanism, the search queue is best maintained as a 
-search-tree of search-trees ordered by cost and depth, respectively.
+best costs of the pruned nodes within their antecedent nodes to ensure that 
+crucial information about the search space is not lost.   To facilitate this mechanism, the search 
+queue is best maintained as a search-tree of search-trees ordered by cost and depth, respectively.
 
-The pruning of the search queue allows SMA* search to utilize all available memory for search, 
+The pruning of the search queue allows SMA* search to utilize all available memory for search
 without any danger of overflow.   It can, however, make SMA* search significantly slower than 
 a theoretical unbounded-memory search, due to the extra bookkeeping it must do, and because 
 nodes may need to be re-expanded (the overall number of node expansions may increase).
 
 It can be shown that of the memory-bounded variations of A* search, such MA*, IDA*, 
 Iterative Expansion, etc., SMA* search expands the least number of nodes on average.
-However, for certain classes of problems, particularly those where the branching factor
-of the search space is large, guaranteeing optimality can be costly. 
-Stochastic methods or approximation algorithms such as I<Simulated Annealing> can 
-provide massive gains in time and space performance, while introducing a tunable 
-probability of producing a sub-optimal solution.
+However, for certain classes of problems, guaranteeing optimality can be costly.   
+This is particularly true in solution spaces where:
+
+
+=over
+
+=item *
+
+the branching factor of the search space is large
+
+=item *
+
+there are multiple equivalent optimal solutions (or shortest paths)
+
+=back
+
+
+For solution spaces with these characteristics, stochastic methods or approximation 
+algorithms such as I<Simulated Annealing> can provide a massive reduction in time and 
+space requirements, while introducing a tunable probability of producing a 
+sub-optimal solution.
 
 
 =head1 METHODS
@@ -785,10 +814,11 @@ Creates a new SMA* search object.
     $MAX_COST,            # indicate the maximum cost allowed in search
     );
 
-Initiates a memory-bounded search.    You must pass a log_function for recording 
-current status, a function that returns a *unique* string representing a node in the 
-search-space, a maximum number of expanded states to store in the queue, and a maximum 
-cost value, beyond which the search will cease.
+Initiates a memory-bounded search.  When calling this function, pass a handle to a function for recording 
+current status( C<log_function> above- this can be an empty subroutine if you don't care), a 
+function that returns a *unique* string representing a node in the search-space (this *cannot* be 
+an empty subroutine), a maximum number of expanded states to store in the queue, and a maximum cost 
+value (beyond which the search will cease).
 
 
 =head2 state_eval_func()
@@ -859,10 +889,10 @@ None by default.
 
 =head1 SEE ALSO
 
-Russell, Stuart. (1992) I<"Efficient Memory-bounded Search Methods."> Proceedings of the 10th 
+[1] Russell, Stuart. (1992) I<"Efficient Memory-bounded Search Methods."> Proceedings of the 10th 
 European conference on Artificial intelligence, pp. 1-5 
 
-Chakrabarti, P. P., Ghose, S., Acharya, A., and de Sarkar, S. C. (1989) I<"Heuristic search in 
+[2] Chakrabarti, P. P., Ghose, S., Acharya, A., and de Sarkar, S. C. (1989) I<"Heuristic search in 
 restricted memory.">  Artificial Intelligence Journal, 41, pp. 197-221.
 
 =head1 AUTHOR
