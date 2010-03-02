@@ -25,7 +25,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.031';
+our $VERSION = '0.04';
 
 use AI::Pathfinding::SMAstar::PriorityQueue;
 use AI::Pathfinding::SMAstar::Path;
@@ -151,9 +151,22 @@ sub add_start_state
 	croak "Error:  Number of state successors is not numeric.  Cannot add state to queue.\n";	
     }
 
+    # test out the iterator function to make sure it returns
+    #  an object of the correct type
+    my $classname = ref($state);
+    my $test_successor_iterator = $state_obj->{_successors_iterator}->($state);
+    my $test_successor = $test_successor_iterator->($state);
+    my $succ_classname = ref($test_successor);
 
+    unless($succ_classname eq $classname){
+	croak "Error:  Successor iterator method of object $classname does " .
+	    "not return an object of type $classname.\n";	
+    }
+
+    
     # add this node to the queue
     $self->{_priority_queue}->insert($state_obj);
+ 
 }
 
 ###################################################################
@@ -524,7 +537,7 @@ AI::Pathfinding::SMAstar - Simplified Memory-bounded A* Search
         # evaluates f(n) = g(n) + h(n), returns a number
     	_state_eval_func           => \&FrontierObj::evaluate,
 
-        # when called on a node, returns true if it is a goal
+        # when called on a node, returns 1 if it is a goal
 	_state_goal_p_func         => \&FrontierObj::goal_test,
 
         # must return the number of successors of a node
@@ -548,8 +561,8 @@ AI::Pathfinding::SMAstar - Simplified Memory-bounded A* Search
 
  
  #
- # Start the search.  If successful, $frontierGoalPath will contain the 
- # goal path.   The optimal path to the goal node will be encoded in the 
+ # Start the search.  If successful, $frontierGoalPath will contain the
+ # goal path.   The optimal path to the goal node will be encoded in the
  # ancestry of the goal path.   $frontierGoalPath->antecedent() contains
  # the goal path's parent path, and so forth back to the start path, which
  # contains only the start state.
@@ -565,21 +578,22 @@ AI::Pathfinding::SMAstar - Simplified Memory-bounded A* Search
 
 
 
-In the example above, a hypothetical object, C<FrontierObj>, is used to represent a state, or 
-I<node> in your search space.   To use SMA* search to find a shortest path from a starting node 
-to a goal in your search space, you must define what a I<node> is, in your search space 
-(or I<point>, or I<state>).
+In the example above, a hypothetical object, C<FrontierObj>, is used to
+represent a state, or I<node> in your search space.   To use SMA* search to
+find a shortest path from a starting node to a goal in your search space, you must
+define what a I<node> is, in your search space (or I<point>, or I<state>).
 
-A common example used for informed search methods, and one that is used in Russell's 
-original paper, is optimal puzzle solving, such as solving an 8 or 15-tile puzzle in the
-least number of moves.   If trying to solve such a puzzle, a I<node> in the search space 
-could be defined as a  configuration of that puzzle (a paricular ordering of the tiles).
+A common example used for informed search methods, and one that is used in Russell's
+original paper, is optimal puzzle solving, such as solving an 8 or 15-tile puzzle
+in the least number of moves.   If trying to solve such a puzzle, a I<node> in the
+search space could be defined as a  configuration of that puzzle (a paricular
+ordering of the tiles).
 
-There is an example provided in the /t directory of this module's distribution, 
-where SMA* is applied to the problem of finding the shortest palindrome that contains 
-a minimum number of letters specified, over a given list of words.
+There is an example provided in the /t directory of this module's distribution,
+where SMA* is applied to the problem of finding the shortest palindrome that
+contains a minimum number of letters specified, over a given list of words.
 
-Once you have a definition and representation of a node in your search space, SMA* 
+Once you have a definition and representation of a node in your search space, SMA*
 search requires the following functions to work:
 
 
@@ -590,23 +604,24 @@ search requires the following functions to work:
 
 B<State evaluation function> (C<_state_eval_func above>)
 
-This function must return the cost of this node in the search space.   In all 
-forms of A* search, this means the cost paid to arrive at this node along a path, plus the 
-estimated cost of going from this node to a goal state:
+This function must return the cost of this node in the search space.   In all
+forms of A* search, this means the cost paid to arrive at this node along a
+path, plus the estimated cost of going from this node to a goal state:
 
 I<f(x) = g(n) + h(n)>
 
-This function must be I<positive> and I<monotonic>, meaning that the path to a successor node 
-must be at least as expensive overall when compared to the path to that node's antecedent.   So if the 
-nodes along a particular path are labeled:  1 -> 2 -> 3, it must be at least as expensive to 
-arrive at node 3 as it is to arrive at node 2.   This amounts to the evaluation of the following 
-assignment [1] when calculating the cost of a successor of node I<x>:
+This function must be I<positive> and I<monotonic>, meaning that the path to a
+successor node must be at least as expensive overall when compared to the path
+to that node's antecedent.   So if the nodes along a particular path are
+labeled:  1 -> 2 -> 3, it must be at least as expensive to arrive at node 3 as
+it is to arrive at node 2.   This amounts to the evaluation of the following
+assignment B<[1]> when calculating the cost of a successor of node I<x>:
 
 I<f(successor) = max(f(x), g(successor) + h(successor))>  
 
-NOTE: Monotonicity is ensured in this implementation of SMA*, so even if your 
-function is not monotonic (which is possible, even given an admissible heuristic), 
-SMA* will assign the antecedent node's cost to a successor if 
+NOTE: Monotonicity is ensured in this implementation of SMA*, so even if your
+function is not monotonic (which is possible, even given an admissible 
+heuristic), SMA* will assign the antecedent node's cost to a successor if
 that successor's I<g+h> amounts to less than the antecedent's f-cost.
 
 
@@ -614,25 +629,26 @@ that successor's I<g+h> amounts to less than the antecedent's f-cost.
 
 B<State goal function> (C<_state_goal_p_func> above)
 
-This function must return 1 if the node is a goal node, or 0 otherwise.
+Goal predicate function.  This function must return 1 if the object argument is a
+goal node, or 0 otherwise.
 
 
 =item *
 
 B<State number of successors function> (C<_state_num_successors_func> above)
 
-This function must return the number of successors of this node, i.e. all nodes that 
-are reachable from this node via a single operation.
+This function must return the number of successors of the argument object/node, 
+i.e. all nodes that are reachable from this node via a single operation.
 
 
 =item *
 
 B<State successors iterator> (C<_state_iterator> above)
 
-This function must return a I<handle to a function> that produces the next successor of 
-this node, i.e. it must return an iterator function that produces the successors of this 
-node *one* at a time.    This is necessary to maintain the memory-bounded 
-constraint of SMA* search.
+This function must return a I<handle to a function> that produces the next
+successor of the argument object, i.e. it must return an iterator function that
+produces the successors of this node *one* at a time.    This is necessary
+to maintain the memory-bounded constraint of SMA* search.
 
 
 =item *
@@ -646,40 +662,40 @@ This function returns a string representation of this node.
 
 B<State show-progress function> (C<_show_prog_func> above)
 
-This is a callback function for displaying the progress of the search.   It can be 
-an empty callback if you do not need this output.
+This is a callback function for displaying the progress of the search.
+It can be an empty callback if you do not need this output.
 
 
 =item *
 
 B<log string function> (C<log_function> above)
 
-This is an arbitrary string used for logging.    It also gets passed to the show-progress 
-function above.
+This is an arbitrary string used for logging.    It also gets passed to
+the show-progress function above.
 
 
 =item *
 
 B<str_function> (C<str_function> above)
 
-This function returns a *unique* string representation of this node.   Uniqueness is 
-required for SMA* to work
-properly.
+This function returns a *unique* string representation of this node.
+Uniqueness is required for SMA* to work properly.
 
 
 =item *
 
 B<max states allowed in memory> (C<max_states_in_queue> above)
 
-An integer indicating the maximum number of expanded nodes to hold in memory at 
-any given time.
+An integer indicating the maximum number of expanded nodes to hold in
+memory at any given time.
 
 
 =item *
 
 B<maximum cost> (C<MAX_COST> above)
 
-An integer indicating the maximum cost, beyond which nodes will not be expanded.
+An integer indicating the maximum cost, beyond which nodes will not
+be expanded.
 
 
 
@@ -694,11 +710,12 @@ An integer indicating the maximum cost, beyond which nodes will not be expanded.
 
 =head2 Overview
 
-Simplified Memory-bounded A* search (or SMA* search) addresses some of the limitations of 
-conventional A* search, by bounding the amount of space required to perform a shortest-path 
-search.   This module is an implementation of SMA*, which was first introduced by Stuart Russell 
-in 1992.   SMA* is a more efficient variation of the original MA* search introduced by 
-P. Chakrabarti et al. in 1989 (see references below).
+Simplified Memory-bounded A* search (or SMA* search) addresses some of the
+limitations of conventional A* search, by bounding the amount of space required
+to perform a shortest-path search.   This module is an implementation of
+SMA*, which was first introduced by Stuart Russell in 1992.   SMA* is a simpler,
+more efficient variation of the original MA* search introduced by P. Chakrabarti
+et al. in 1989 (see references below).
 
 
 
@@ -707,15 +724,16 @@ P. Chakrabarti et al. in 1989 (see references below).
 
 =head3 A* search
 
-A* Search is an I<optimal> and I<complete> algorithm for computing a sequence of operations 
-leading from a system's start-state (node) to a specified goal.    In this context, I<optimal> 
-means that A* search will return the shortest (or cheapest) possible sequence of 
-operations (path) leading to the goal, and I<complete> means that A* will always find a path to 
+A* Search is an I<optimal> and I<complete> algorithm for computing a sequence of
+operations leading from a system's start-state (node) to a specified goal.
+In this context, I<optimal> means that A* search will return the shortest
+(or cheapest) possible sequence of operations (path) leading to the goal,
+and I<complete> means that A* will always find a path to 
 the goal if such a path exists.
 
-In general, A* search works using a calculated cost function on each node along a path, 
-in addition to an I<admissible> heuristic estimating the distance from that node to the goal.  
-The cost is calculated as:
+In general, A* search works using a calculated cost function on each node along a
+path, in addition to an I<admissible> heuristic estimating the distance from 
+that node to the goal.  The cost is calculated as:
 
 I<f(n) = g(n) + h(n)>
 
@@ -734,41 +752,47 @@ I<g(n)> is the total cost of the path leading up to I<n>
 
 =item *
 
-I<h(n)> is the heuristic function, or estimated cost of the path from I<n> to the goal node.
+I<h(n)> is the heuristic function, or estimated cost of the path from I<n>
+to the goal node.
 
 =back
 
 
-For a given I<admissible> heuristic function, it can be shown that A* search is I<optimally efficient>, 
-meaning that,  in its calculation of the shortest path, it expands fewer nodes in the search 
-space than any other algorithm.
+For a given admissible heuristic function, it can be shown that A* search
+is I<optimally efficient>, meaning that,  in its calculation of the shortest
+path, it expands fewer nodes in the search space than any other algorithm.
 
-The to be I<admissible>, the heuristic can never over-estimate the distance from the 
-node to the goal.   Note that if the heuristic I<h(n)> is set to zero, A* search reduces to 
-I<Branch and Bound> search.  If the cost-so-far I<g(n)> is set to zero, A* reduces to 
-I<Greedy Best-first> search (which is neither complete nor optimal).   If both I<g(n)> 
-and I<h(n)> are set to zero, the search becomes I<Breadth-first>.
+To be admissible, the heuristic I<h(n)> can never over-estimate the distance
+from the node to the goal.   Note that if the heuristic I<h(n)> is set to
+zero, A* search reduces to I<Branch and Bound> search.  If the cost-so-far
+I<g(n)> is set to zero, A* reduces to I<Greedy Best-first> search (which is
+neither complete nor optimal).   If both I<g(n)> and I<h(n)> are set to zero,
+the search becomes I<Breadth-first>, which is complete and optimal, but not
+optimally efficient.
 
-The space complexity of A* search is bounded by an exponential of the branching factor of 
-the search-space, by the length of the longest path examined during the search.   This is 
-can be a problem particularly if the branching factor is large, because the algorithm may run 
-out of memory.
+The space complexity of A* search is bounded by an exponential of the
+branching factor of the search-space, by the length of the longest path
+examined during the search.   This is can be a problem particularly if the
+branching factor is large, because the algorithm may run out of memory.
 
 
 =head3 SMA* Search
 
-SMA* search addresses the possibility of running out of memory during search by pruning the 
-portion of the search-space that is being examined.    It relies on the I<pathmax>, 
-or I<monotonicity> constraint on I<f(n)> to remove the shallowest of the highest-cost 
-nodes from the search queue when there is no memory left to expand new nodes.  It records the 
-best costs of the pruned nodes within their antecedent nodes to ensure that 
-crucial information about the search space is not lost.   To facilitate this mechanism, the search 
-queue is best maintained as a search-tree of search-trees ordered by cost and depth, respectively.
+SMA* search addresses the possibility of running out of memory during search
+by pruning the portion of the search-space that is being examined.    It
+relies on the I<pathmax>, or I<monotonicity> constraint on I<f(n)> to
+remove the shallowest of the highest-cost nodes from the search queue when
+there is no memory left to expand new nodes.  It records the best costs of the
+pruned nodes within their antecedent nodes to ensure that crucial information
+about the search space is not lost.   To facilitate this mechanism, the search
+queue is best maintained as a search-tree of search-trees ordered by cost and
+depth, respectively.
 
-The pruning of the search queue allows SMA* search to utilize all available memory for search
-without any danger of overflow.   It can, however, make SMA* search significantly slower than 
-a theoretical unbounded-memory search, due to the extra bookkeeping it must do, and because 
-nodes may need to be re-expanded (the overall number of node expansions may increase).
+The pruning of the search queue allows SMA* search to utilize all available
+memory for search without any danger of overflow.   It can, however, make
+SMA* search significantly slower than a theoretical unbounded-memory search,
+due to the extra bookkeeping it must do, and because nodes may need to be
+re-expanded (the overall number of node expansions may increase).
 
 It can be shown that of the memory-bounded variations of A* search, such MA*, IDA*, 
 Iterative Expansion, etc., SMA* search expands the least number of nodes on average.
@@ -784,15 +808,15 @@ the branching factor of the search space is large
 
 =item *
 
-there are multiple equivalent optimal solutions (or shortest paths)
+there are many equivalent optimal solutions (or shortest paths)
 
 =back
 
 
-For solution spaces with these characteristics, stochastic methods or approximation 
-algorithms such as I<Simulated Annealing> can provide a massive reduction in time and 
-space requirements, while introducing a tunable probability of producing a 
-sub-optimal solution.
+For solution spaces with these characteristics, stochastic methods or
+approximation algorithms such as I<Simulated Annealing> can provide a
+massive reduction in time and space requirements, while introducing a
+tunable probability of producing a sub-optimal solution.
 
 
 =head1 METHODS
@@ -814,10 +838,11 @@ Creates a new SMA* search object.
     $MAX_COST,            # indicate the maximum cost allowed in search
     );
 
-Initiates a memory-bounded search.  When calling this function, pass a handle to a function for recording 
-current status( C<log_function> above- this can be an empty subroutine if you don't care), a 
-function that returns a *unique* string representing a node in the search-space (this *cannot* be 
-an empty subroutine), a maximum number of expanded states to store in the queue, and a maximum cost 
+Initiates a memory-bounded search.  When calling this function, pass a handle to
+a function for recording current status( C<log_function> above- this can be
+an empty subroutine if you don't care), a function that returns a *unique* string
+representing a node in the search-space (this *cannot* be an empty subroutine), a
+maximum number of expanded states to store in the queue, and a maximum cost
 value (beyond which the search will cease).
 
 
@@ -825,14 +850,16 @@ value (beyond which the search will cease).
 
  $smastar->state_eval_func(\&FrontierObj::evaluate);
 
-Set or get the handle to the function that returns the cost of this node in the search space. 
+Set or get the handle to the function that returns the cost of the object 
+argument (node) in the search space. 
 
 
 =head2 state_goal_p_func()
 
  $smastar->state_goal_p_func(\&FrontierObj::goal_test);
 
-Set/get the handle to the function that returns 1 if the node is a goal node, or 0 otherwise.
+Set/get the handle to the goal predicate function.   This is a function 
+that returns 1 if the argument object is a goal node, or 0 otherwise.
 
 
 
@@ -840,29 +867,32 @@ Set/get the handle to the function that returns 1 if the node is a goal node, or
 
  $smastar->state_num_successors_func(\&FrontierObj::get_num_successors);
 
-Set/get the handle to the function that returns the number of successors of this node.
+Set/get the handle to the function that returns the number of successors 
+of this the object argument (node).
 
 
 =head2 state_successors_iterator()
 
  $smastar->state_successors_iterator(\&FrontierObj::get_successors_iterator);
 
-Set/get the handle to the function that returns iterator that produces the next successor of this node.
+Set/get the handle to the function that returns iterator that produces the 
+next successor of this node.
 
 
 =head2 state_get_data_func()
 
  $smastar->state_get_data_func(\&FrontierObj::string_representation);
 
-Set/get the handle to the function that returns a string representation of this node.
+Set/get the handle to the function that returns a string 
+representation of this node.
 
 
 =head2 show_prog_func()
 
  $smatar->show_prog_func(\&FrontierObj::progress_callback);
 
-Sets/gets the callback function for displaying the progress of the search.   It can 
-be an empty callback (sub{}) if you do not need this output.
+Sets/gets the callback function for displaying the progress of the search.
+It can be an empty callback (sub{}) if you do not need this output.
 
 
 
@@ -889,11 +919,12 @@ None by default.
 
 =head1 SEE ALSO
 
-[1] Russell, Stuart. (1992) I<"Efficient Memory-bounded Search Methods."> Proceedings of the 10th 
-European conference on Artificial intelligence, pp. 1-5 
+[1] Russell, Stuart. (1992) I<"Efficient Memory-bounded Search Methods."> 
+Proceedings of the 10th European conference on Artificial intelligence, pp. 1-5 
 
-[2] Chakrabarti, P. P., Ghose, S., Acharya, A., and de Sarkar, S. C. (1989) I<"Heuristic search in 
-restricted memory.">  Artificial Intelligence Journal, 41, pp. 197-221.
+[2] Chakrabarti, P. P., Ghose, S., Acharya, A., and de Sarkar, S. C. (1989)
+I<"Heuristic search in restricted memory.">  Artificial Intelligence Journal, 
+41, pp. 197-221.
 
 =head1 AUTHOR
 

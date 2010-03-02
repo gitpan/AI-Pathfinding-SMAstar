@@ -1,4 +1,4 @@
-AI-Pathfinding-SMAstar version 0.031
+AI-Pathfinding-SMAstar version 0.04
 ===================================
 
 NAME
@@ -24,7 +24,7 @@ EXAMPLE
         # evaluates f(n) = g(n) + h(n), returns a number
         _state_eval_func           => \&FrontierObj::evaluate,
 
-        # when called on a node, returns true if it is a goal
+        # when called on a node, returns 1 if it is a goal
         _state_goal_p_func         => \&FrontierObj::goal_test,
 
         # must return the number of successors of a node
@@ -85,7 +85,7 @@ expensive than their antecedent nodes. Monotonicity is ensured in this implement
 of SMA*, so even if your function is not monotonic, SMA* will assign the antecedent 
 node's cost to a successor if that successor costs less than the antecedent.
   
-  * State goal function (_state_goal_p_func above)
+  * State goal predicate function (_state_goal_p_func above)
 
       This function must return 1 if the node is a goal node, or 0 otherwise.
     
@@ -98,8 +98,9 @@ node's cost to a successor if that successor costs less than the antecedent.
 
   * State successors iterator (_state_iterator above)
 
-      This function must return the next successor of this node, i.e. it must be an 
-      iterator that produces the successors of this node *one* at a time. This is 
+      This function must return a *handle to a function* that returns next 
+      successor of this node, i.e. it must return an iterator that produces 
+      the successors of this node *one* at a time. This is 
       necessary to maintain the memory-bounded constraint of SMA* search.
     
 
@@ -194,24 +195,33 @@ branching factor is large, as the algorithm may run out of memory.
 
 SMA* Search
 
-SMA* search addresses the possibility of running out of memory by pruning 
-the portion of the search-space that is being examined. It uses the pathmax 
-property, or monotonicity constraint on f(n), to remove nodes from the 
-search queue when there is no memory left to store them, recording their 
-costs within their antecedent nodes to ensure that information about the 
-search space is not lost. This allows SMA* search to use all available 
-memory for search, without any danger of overflow. It can, however, make SMA* 
-search significantly slower, due to the extra book-keeping it must do, and 
-because nodes may need to be re-expanded (the overall number of nodes 
-examined may increase).
+SMA* search addresses the possibility of running out of memory during search by 
+pruning the portion of the search-space that is being examined. It relies on the 
+pathmax, or monotonicity constraint on f(n) to remove the shallowest of the 
+highest-cost nodes from the search queue when there is no memory left to 
+expand new nodes. It records the best costs of the pruned nodes within their 
+antecedent nodes to ensure that crucial information about the search space is not 
+lost. To facilitate this mechanism, the search queue is best maintained as a 
+search-tree of search-trees ordered by cost and depth, respectively.
 
-It can be shown that of the memory-bounded variations of A* search, such IDA*, 
-Iterative Expansion, etc., SMA* search expands the least number of nodes on 
-average.  However, for certain classes of problems, particularly those where 
-the branching factor of the search space is large, guaranteeing optimality 
-seems to be costly.  Stochastic methods or approximation algorithms such as 
-Simulated Annealing can provide massive gains in performance, while 
-introducing a tunable probability of producing a sub-optimal solution.
+The pruning of the search queue allows SMA* search to utilize all available 
+memory for search without any danger of overflow. It can, however, make SMA* 
+search significantly slower than a theoretical unbounded-memory search, due to 
+the extra bookkeeping it must do, and because nodes may need to be re-expanded 
+(the overall number of node expansions may increase).
+
+It can be shown that of the memory-bounded variations of A* search, such MA*, 
+IDA*, Iterative Expansion, etc., SMA* search expands the least number of nodes 
+on average. However, for certain classes of problems, guaranteeing optimality 
+can be costly. This is particularly true in solution spaces where:
+
+    * the branching factor of the search space is large
+    * there are multiple equivalent optimal solutions (or shortest paths)
+
+For solution spaces with these characteristics, stochastic methods or 
+approximation algorithms such as Simulated Annealing can provide a massive 
+reduction in time and space requirements, while introducing a tunable 
+probability of producing a sub-optimal solution.
 
 
 
