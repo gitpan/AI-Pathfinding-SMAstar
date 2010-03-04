@@ -25,7 +25,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use AI::Pathfinding::SMAstar::PriorityQueue;
 use AI::Pathfinding::SMAstar::Path;
@@ -266,6 +266,9 @@ sub sma_star_tree_search
 		# goal achieved! iteration: $iteration, number of 
 		# states in queue: $num_states_in_queue.
 		return $best; 
+	    }
+	    elsif($best->{_f_cost} >= $max_cost){
+		croak "\n\nSearch unsuccessful.  max_cost reached (cost:  $max_cost).\n";
 	    }
 	    else{	    
 		my $successors_iterator = $best->$successors_func();		

@@ -13,3 +13,7 @@ Revision history for Perl extension AI::Pathfinding::SMAstar.
 0.04  Tue Mar  2 13:17:53 2010
       	- updated error handling in add_start_state method
 	- perldoc edits 
+
+0.05  Thu Mar  4 11:06:10 2010
+      	- fixed an issue where search did not terminate when max_cost
+	  is reached.
