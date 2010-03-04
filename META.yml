@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                AI-Pathfinding-SMAstar
-version:             0.05
+version:             0.06
 abstract:            Simplified Memory-bounded A* Search
 license:             ~
 author:              

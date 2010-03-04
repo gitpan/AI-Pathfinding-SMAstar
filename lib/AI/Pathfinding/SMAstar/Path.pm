@@ -487,7 +487,7 @@ sub get_descendants_iterator_smastar
 
 		if($i == $num_successors - 1 && $descendants_deleted){
 		    # !!! resetting iterator index. descendants have been deleted. clearing forgotten_fcosts on next expansion.
-		    $iterator = $self->{_state}->get_descendants_iterator();
+		    $iterator = $self->get_successors_iterator();
 		    $self->{_iterator_index} = 0;
 		    $i = 0;		
 
@@ -529,7 +529,7 @@ sub get_descendants_iterator_smastar
 		$self->{_iterator_index} = $i + 1;
 		
 		if($self->{_iterator_index} == $self->{_num_successors}){
-		    $iterator = $self->{_state}->get_descendants_iterator();
+		    $iterator = $self->get_successors_iterator();
 		    $self->{_iterator_index} = 0;
 		    $i = 0;
 		    	
@@ -547,7 +547,7 @@ sub get_descendants_iterator_smastar
 	if($i >= $num_successors - 1 && $descendants_deleted && $self->depth() == 0){
             # root node.  going to reset iterator index. descendants have been deleted.  Also, will be
             # clearing out forgotten_descendants fcost list, since those descendants will be re-generated anyway.
-	    $iterator = $self->{_state}->get_descendants_iterator();
+	    $iterator = $self->get_successors_iterator();
 	    $self->{_iterator_index} = 0;
 	    $i = 0;
 	    	   

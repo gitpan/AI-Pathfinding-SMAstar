@@ -25,7 +25,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use AI::Pathfinding::SMAstar::PriorityQueue;
 use AI::Pathfinding::SMAstar::Path;
