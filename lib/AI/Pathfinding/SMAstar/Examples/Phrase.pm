@@ -696,6 +696,192 @@ sub get_num_successors
 
 
 
+#-----------------------------------------------------------------------------
+# Get descendants number function.
+#
+# 
+#
+#-----------------------------------------------------------------------------
+sub get_descendants_number
+{
+    my ($phrase_obj) = @_;
+    if(!$phrase_obj){
+	return;
+    }
+	
+    my $words = $phrase_obj->{_word_list};
+    my $words_w_cands = $phrase_obj->{_words_w_cands_list};
+    my $dictionary = $phrase_obj->{_dictionary};
+    my $dictionary_rev = $phrase_obj->{_dictionary_rev};
+    my $repeated_pal_hash_ref = $phrase_obj->{_repeated_pal_hash_ref};
+    my $letters_seen = $phrase_obj->{_letters_seen};
+    my $cost = $phrase_obj->{_cost};
+    my $cost_so_far = $phrase_obj->{_cost_so_far};
+    my $num_chars_so_far = $phrase_obj->{_num_chars_so_far};
+    my $no_match_remainder = $phrase_obj->{_no_match_remainder};
+    my $depth = $phrase_obj->{_depth};
+    
+    my $direction = $phrase_obj->{_dir};
+    my $word = $phrase_obj->{_start_word};
+    my $whole_word = $phrase_obj->{_cand};    
+    my $len_word = length($word);
+    my @cands;
+    my @descendants;
+
+   
+    if($direction == 0){
+	@cands = AI::Pathfinding::SMAstar::Examples::PalUtils::get_cands_from_left($word, $dictionary, $dictionary_rev);
+    }
+    elsif($direction == 1){
+	@cands = AI::Pathfinding::SMAstar::Examples::PalUtils::get_cands_from_right($word, $dictionary, $dictionary_rev);
+    }
+        
+  
+    my @words_to_make_phrases;
+    my $stored_c;
+
+    my $num_successors = 0;
+
+    while(1){
+	# this is a continuation of the second case below, where there were no 
+	# match-remainders for the phrase-so-far, i.e. the palindrome has a space
+	# in the middle with mirrored phrases on each side. 'cat tac' for example.
+	my $next_word = shift(@words_to_make_phrases);
+	if($next_word){
+	    
+	    my $w = $next_word;
+
+	    my $repeated_word_p = 0;
+	    my $antecedent = $phrase_obj->{_predecessor};
+	    my $antecedent_dir = $antecedent->{_dir};
+	    while($antecedent){
+
+		if(defined($antecedent->{_word}) && $w eq $antecedent->{_word} && $antecedent_dir == 0){
+		    $repeated_word_p = 1;
+		    last;
+		}
+		$antecedent = $antecedent->{_predecessor};	
+		if($antecedent){
+		    $antecedent_dir = $antecedent->{_dir};
+		}
+	    }
+
+	    if($repeated_word_p || $w eq $word){		
+		next;  #skip this word, we are already looking at it
+	    }
+	    $num_successors++;	  
+			    	   
+	}
+	else{	
+	    my $c  = shift(@cands);	
+	    if(!$c){
+		return $num_successors;
+	    }
+	    
+	    # ------------- filter for repeated palcands for a particular word------
+	    # ----------------------------------------------------------------------
+	    # This will avoid many repeated patterns among palindromes to trim down the
+	    # number redundant palindromes generated.
+	    # 		
+	    my $letters_seen_str = join("", @{$phrase_obj->{_letters_seen}});
+	    if($letters_seen_str){
+		my $repeated_pal_hash_key;
+		$repeated_pal_hash_key = $word . "^" . $c . "^" . $letters_seen_str;	
+		
+		#print "\n\nrepeated_pal_hash_key: $repeated_pal_hash_key\n";
+		if(my $hash_val = $repeated_pal_hash_ref->{$repeated_pal_hash_key}){
+		    # skip because '$word' <--> '$p' pattern has already appeared in a previous palindrome.
+		    if($hash_val != $depth){
+			next;  #skip
+		    }
+		}
+		else{
+		    #flag this candidate as already having been tested (below).
+		    $repeated_pal_hash_ref->{$repeated_pal_hash_key} = $depth;
+		}	
+	    }
+	    #--------------------------------------------------------------------------
+	    #--------------------------------------------------------------------------
+	    
+	    my $len_c = length($c);
+	    my $rev_c = reverse($c);	
+	    my $word_remainder;
+	    
+	    if($len_c < $len_word){
+		$word_remainder = $c;
+	    }
+	    elsif($len_c > $len_word){	
+		$word_remainder = $word;
+	    }
+	    my $rev_word_remainder = reverse($word);
+	    
+	    my $num_cands = @cands;
+	    
+	    my $match_remainder;
+	    my $len_match_remainder;
+	    
+	    
+	    
+	    if($len_c != $len_word){		
+		$match_remainder = 1;				       
+	    }
+	    
+	    
+	    if($match_remainder){  # there is a length difference between the candidate and this word.		    
+		$num_successors++;
+	    }
+	    else{
+		#
+		# There is no match_remainder, so this candidate is the reverse
+		# of $word, or the phrase built so far is an "even" palindrome,
+		# i.e. it has a word boundary (space) in the middle.
+		#
+		#
+		# This is a special case since there is no match remainder.
+		# Because there is no remainder to create new phrase obj from, this 
+		# section goes through the whole word list and creates phrase objects
+		# for each new word.   The number of new characters offered by each
+		# word is recorded to help with guided search.
+		#
+		# Update:  this case now only goes through the word list for which there
+		# are cands.
+		
+		@words_to_make_phrases = @$words_w_cands;
+		#@words_to_make_phrases = @$words;
+		
+		
+		$stored_c = $c;
+		my $next_word = shift(@words_to_make_phrases);
+		my $w = $next_word;
+		
+		my $repeated_word_p = 0;
+		my $antecedent = $phrase_obj->{_predecessor};
+		my $antecedent_dir = $antecedent->{_dir};
+		while($antecedent){
+		    
+		    if(defined($antecedent->{_word}) && $w eq $antecedent->{_word} && $antecedent_dir == 0){
+			$repeated_word_p = 1;
+			last;
+		    }
+		    $antecedent = $antecedent->{_predecessor};	
+		    if($antecedent){
+			$antecedent_dir = $antecedent->{_dir};
+		    }
+		}
+		
+		if($repeated_word_p || $w eq $word){
+		    next; #skip this word, we are already looking at it
+		}
+		$num_successors++;	  		
+	    }		
+	}	
+    }
+
+    return $num_successors;
+
+}
+
+
 
 #-----------------------------------------------------------------------------
 # Get descendants iterator function.

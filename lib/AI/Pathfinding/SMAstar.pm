@@ -25,7 +25,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use AI::Pathfinding::SMAstar::PriorityQueue;
 use AI::Pathfinding::SMAstar::Path;
@@ -781,21 +781,27 @@ branching factor is large, because the algorithm may run out of memory.
 
 =head3 SMA* Search
 
-SMA* search addresses the possibility of running out of memory during search
-by pruning the portion of the search-space that is being examined.    It
-relies on the I<pathmax>, or I<monotonicity> constraint on I<f(n)> to
-remove the shallowest of the highest-cost nodes from the search queue when
-there is no memory left to expand new nodes.  It records the best costs of the
-pruned nodes within their antecedent nodes to ensure that crucial information
-about the search space is not lost.   To facilitate this mechanism, the search
-queue is best maintained as a search-tree of search-trees ordered by cost and
-depth, respectively.
+Like A* search, SMA* search is an optimal and complete algorithm for finding
+a least-cost path.   Unlike A*, SMA* will not run out of memory, I<unless the size
+of the shortest path exceeds the amount of space in available memory>.
+
+SMA* addresses the possibility of running out of memory 
+by pruning the portion of the search-space that is being examined.  It relies on 
+the I<pathmax>, or I<monotonicity> constraint on I<f(n)> to remove the shallowest 
+of the highest-cost nodes from the search queue when there is no memory left to 
+expand new nodes.  It records the best costs of the pruned nodes within their 
+antecedent nodes to ensure that crucial information about the search space is 
+not lost.   To facilitate this mechanism, the search queue is best maintained 
+as a search-tree of search-trees ordered by cost and depth, respectively.
+
+=head4 Nothing is for free
 
 The pruning of the search queue allows SMA* search to utilize all available
 memory for search without any danger of overflow.   It can, however, make
 SMA* search significantly slower than a theoretical unbounded-memory search,
 due to the extra bookkeeping it must do, and because nodes may need to be
-re-expanded (the overall number of node expansions may increase).
+re-expanded (the overall number of node expansions may increase).  
+In this way there is a trade-off between time and space.
 
 It can be shown that of the memory-bounded variations of A* search, such MA*, IDA*, 
 Iterative Expansion, etc., SMA* search expands the least number of nodes on average.
